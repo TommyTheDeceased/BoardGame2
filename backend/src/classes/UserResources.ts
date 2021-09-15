@@ -17,14 +17,15 @@ export default class UserResources {
     var room2 = this.roomdatas.find((room2) => room2.room === room);
     if (room2) {
       room2.users.push(name);
+      room2.playerHealth[name] = 100;
     } else {
       this.roomdatas.push({
         room: room,
         playerHealth: {
           "Player 1": 100,
-          "Player 2": 100,
-          "Player 3": 100,
-          "Player 4": 100,
+          "Player 2": 0,
+          "Player 3": 0,
+          "Player 4": 0,
         },
         playerCash: {
           "Player 1": 0,

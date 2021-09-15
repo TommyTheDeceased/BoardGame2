@@ -6,6 +6,7 @@ import Header from "../components/header";
 import SideBar from "../components/userinfo";
 import { History } from "history";
 import "./game.css";
+import { handleRoll } from "./functions";
 
 type GameProps = {
   socket: Socket<DefaultEventsMap, DefaultEventsMap>;
@@ -67,6 +68,8 @@ export default function Game({
     "Player 3": 0,
     "Player 4": 0,
   });
+  const [squaredata,setSquareData] = useState<any>({});
+  const [card,setchosencard] = useState<string>("");
 
   //server messages
 
@@ -81,9 +84,9 @@ export default function Game({
           turn: "Player 1",
           playerHealth: {
             "Player 1": 100,
-            "Player 2": 100,
-            "Player 3": 100,
-            "Player 4": 100,
+            "Player 2": 0,
+            "Player 3": 0,
+            "Player 4": 0,
           },
           playerCash: {
             "Player 1": 0,
@@ -101,7 +104,7 @@ export default function Game({
           users: ["Player 1"],
         });
       }
-      if (error) {
+      if (error === "game is full") {
         setFull(true);
         setCurrentServerMessage("Game Full");
       }
@@ -177,6 +180,8 @@ export default function Game({
         playerPositions,
         winner,
         rolled,
+        chosenCard,
+        oldturn,
       }) => {
         var amount_cant_play: any[] = [];
         for (var [key, value] of Object.entries(playerHealth)) {
@@ -197,38 +202,40 @@ export default function Game({
             }
           }
         }
-        if (amount_cant_play.length >= 3) {
-          var winning;
-          if (
-            playerHealth["Player 1"] === 0 &&
-            playerHealth["Player 2"] === 0 &&
-            playerHealth["Player 3"] === 0
-          ) {
-            winning = "Player 4";
-          } else if (
-            playerHealth["Player 4"] === 0 &&
-            playerHealth["Player 3"] === 0 &&
-            playerHealth["Player 2"] === 0
-          ) {
-            winning = "Player 1";
-          } else if (
-            playerHealth["Player 1"] === 0 &&
-            playerHealth["Player 3"] === 0 &&
-            playerHealth["Player 4"] === 0
-          ) {
-            winning = "Player 2";
-          } else if (
-            playerHealth["Player 2"] === 0 &&
-            playerHealth["Player 1"] === 0 &&
-            playerHealth["Player 4"] === 0
-          ) {
-            winning = "Player 3";
-          }
-          if (winning) {
-            socket.emit("AnnounceWinner", {
-              winnerName: winning,
-              room: roomid,
-            });
+        if(users.length >= 2) {
+          if (amount_cant_play.length >= users.length) {
+            var winning;
+            if (
+              playerHealth["Player 1"] === 0 &&
+              playerHealth["Player 2"] === 0 &&
+              playerHealth["Player 3"] === 0
+            ) {
+              winning = "Player 4";
+            } else if (
+              playerHealth["Player 4"] === 0 &&
+              playerHealth["Player 3"] === 0 &&
+              playerHealth["Player 2"] === 0
+            ) {
+              winning = "Player 1";
+            } else if (
+              playerHealth["Player 1"] === 0 &&
+              playerHealth["Player 3"] === 0 &&
+              playerHealth["Player 4"] === 0
+            ) {
+              winning = "Player 2";
+            } else if (
+              playerHealth["Player 2"] === 0 &&
+              playerHealth["Player 1"] === 0 &&
+              playerHealth["Player 4"] === 0
+            ) {
+              winning = "Player 3";
+            }
+            if (winning) {
+              socket.emit("AnnounceWinner", {
+                winnerName: winning,
+                room: roomid,
+              });
+            }
           }
         }
         setLastRolled(rolled);
@@ -239,6 +246,20 @@ export default function Game({
         setPlayerCash(playerCash);
         setPlayerPosition(playerPositions);
         setLastRolled(rolled);
+        if(chosenCard !== "") {
+          if(chosenCard !== "no card" && card !== "community card") {
+            const amt = chosenCard.split(":")[1]
+            if(chosenCard.includes("damage card:")) {
+              setchosencard(`${oldturn} Has picked up a Damage Card dealing ${amt} HP`);
+            } else if(chosenCard.includes("cash card:")) {
+              setchosencard(`${oldturn} Picked up a Cash Card And Gained $${amt}`);
+            }
+          } else if(chosenCard === "community card") {
+            setchosencard(`${oldturn} picked up a community card`)
+          }
+        } else {
+          setchosencard("")
+        }
       }
     );
 
@@ -251,56 +272,9 @@ export default function Game({
         setGameOver(true);
       }
     });
-  }, [socket, room, roomid, users]);
+  }, [socket, room, roomid, users,card]);
 
-  const handleRoll = (
-    event: React.MouseEvent<HTMLButtonElement, MouseEvent>
-  ) => {
-    if (turn === currentUser) {
-      var randomnumber = 0;
-      let interval = setInterval(() => {
-        randomnumber = Math.floor(Math.random() * 6) + 1;
-        socket.emit("updateRollNum", {
-          room: roomid,
-          number: randomnumber.toString(),
-        });
-      }, 500);
-      setTimeout(() => {
-        clearInterval(interval);
-        setLastRolled(randomnumber.toString());
-        var newturn: any;
-        playerPositions[turn] += randomnumber;
-        const playernum = turn.split(" ")[1];
-        if (parseInt(playernum) >= users.length) {
-          newturn = "Player 1";
-        } else {
-          newturn = `Player ${parseInt(playernum) + 1}`;
-        }
-
-        socket.emit("updateGameState", {
-          gameOver,
-          turn: newturn,
-          playerHealth,
-          playerCash,
-          playerPositions,
-          winner,
-          rolled: randomnumber.toString(),
-        });
-
-        setTimeout(() => {
-          socket.emit("updateGameState", {
-            gameOver,
-            turn: newturn,
-            playerHealth,
-            playerCash,
-            playerPositions,
-            winner,
-            rolled: "Roll",
-          });
-        }, 1750);
-      }, 2000);
-    }
-  };
+  
 
   if (full === false) {
     return (
@@ -315,7 +289,7 @@ export default function Game({
         />
         <div className="Center">
           <div className="Board">
-            <button className="dice-roll" onClick={(e) => handleRoll(e)}>
+            <button className="dice-roll" onClick={(e) => handleRoll(e,socket,turn,currentUser,room,setLastRolled,playerPositions,users,gameOver,playerHealth,playerCash,winner,squaredata,setSquareData)}>
               {lastRolled === "Roll" ? "Roll" : `Last Roll: ${lastRolled}`}
             </button>
           </div>
@@ -326,6 +300,11 @@ export default function Game({
             }}
           >
             WINNER: {winner}
+          </h1>
+          <h1 className="chosencard" style={{
+            visibility: card !== "" ? "visible" : "hidden",
+          }}>
+              {card}
           </h1>
         </div>
       </div>
