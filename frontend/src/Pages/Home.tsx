@@ -31,10 +31,11 @@ export default function HomePage({
   };
 
   return (
-    <div>
+    <div className="MainHome">
+      <h1 className="title">Title Here</h1>
       <form onSubmit={(e) => handleJoin(e)}>
         <input
-          placeholder="Room Id"
+          placeholder="Enter A Room Id"
           onChange={(event) => handleValue(event)}
           value={pageroomid}
         />
